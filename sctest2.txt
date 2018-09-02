@@ -1,0 +1,1809 @@
+
+	{
+		"AWSTemplateFormatVersion": "2010-09-09",
+		"Description": "Creates VPC for sandbox ScaleCapacity",
+		
+		"Parameters": {
+			"VPCName": {
+				"Description": "Name of VPC",
+				"Type": "String",
+				"Default":"ScaleCapacitySandbox"
+			},
+			"VPCCidrBlock": {
+				"Description": "Cidr of overall VPC space",
+				"Type": "String",
+				"Default":"10.182.128.0/21"
+			},		
+			"KeyPairName":{
+				"Description":"Key Pair Name",
+				"Type":"String",
+				"Default":"gns-key-datasciences-east"
+			},	
+			"DhcpDomainName":{
+				"Description":"Domain Name for DHCP options",
+				"Type":"String",
+				"Default":"ec2.internal"
+			},
+			"DhcpDnsServers":{
+				"Description":"DNS for DHCP options",
+				"Type": "String",
+				"Default":"10.75.32.5"
+			},
+			"DhcpNtp":{
+				"Description":"NTP for DHCP options",
+				"Type":"String",
+				"Default":"10.75.33.5"
+			},	  
+			"sshSource1": {
+				"Description":"Specify which IP range has SSH access to AWS EC2 instances",
+				"Type":"String",
+				"Default":"10.0.0.0/8"
+			},
+			"sshSource2": {
+				"Description":"Specify which IP range has SSH access to AWS EC2 instances",
+				"Type":"String",
+				"Default":"192.168.0.0/16"
+			},
+			"sshSource3": {
+				"Description":"Specify which IP range has SSH access to AWS EC2 instances",
+				"Type":"String",
+				"Default":"172.16.0.0/12"
+			}
+		},   	
+		"Resources": {
+			"vpc1": {
+				"Type": "AWS::EC2::VPC",
+				"Properties": {
+					"CidrBlock": {
+						"Ref": "VPCCidrBlock"
+					},
+					"EnableDnsSupport": "true",
+					"EnableDnsHostnames": "true",
+					"InstanceTenancy": "default",
+					"Tags": [{
+							"Key": "Name",
+							"Value": {
+								"Ref": "VPCName"
+								}
+							},
+							{
+							"Key": "ProductCode",
+								 "Value": "PRD00000122"
+							},
+							{
+							"Key": "InventoryCode",
+								 "Value": "network-vpc"
+							},
+							{
+							"Key": "Environment",
+								 "Value": "datasciences.prod1"
+							}
+					]
+				}
+	
+			},	
+			"VpcDhcpOptions" : {
+			 "Type" : "AWS::EC2::DHCPOptions",
+			 "Properties" : {
+			 "DomainName" : {"Ref":"DhcpDomainName"},
+			 "DomainNameServers" : [{"Ref":"DhcpDnsServers"}],
+			 "NtpServers" : [{"Ref":"DhcpNtp"}],
+			 "Tags" : [{ "Key" : "Name",
+							"Value" : {
+								"Fn::Join": [".", ["dhcp-options", {
+											"Ref": "VPCName"
+										}
+									]
+								]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-dhcpoptions"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						}
+
+					]
+				}
+			},
+	
+			"VpcDHCPOptionsAssociation" : {
+				"Type" : "AWS::EC2::VPCDHCPOptionsAssociation",
+				"Properties" : {
+					"VpcId" : {"Ref" : "vpc1"},
+					"DhcpOptionsId" : {"Ref" : "VpcDhcpOptions"}
+				}
+			},	
+			"igw":{
+				"Type":"AWS::EC2::InternetGateway",
+				"Properties":{
+					"Tags":[{
+							"Key":"Name",
+							"Value":{
+								"Fn::Join": [".",["igw", {
+											"Ref": "VPCName"
+												}
+											]
+										]
+									}
+								},
+							{
+							"Key": "ProductCode",
+								 "Value": "PRD00000122"
+							},
+							{
+							"Key": "InventoryCode",
+								 "Value": "network-igw"
+							},
+							{
+							"Key": "Environment",
+								 "Value": "datasciences.prod1"
+							}
+							]												
+						}
+					},
+			
+			"vgw":{
+				"Type" : "AWS::EC2::VPNGateway",
+				"Properties" : {
+					"Type" : "ipsec.1",
+					"Tags":[{
+							"Key":"Name",
+							"Value":{
+								"Fn::Join": [".",["vgw", {
+											"Ref": "VPCName"
+												}
+											]
+										]
+									}
+								},
+							{
+							"Key": "ProductCode",
+								 "Value": "PRD00000122"
+							},
+							{
+							"Key": "InventoryCode",
+								 "Value": "network-vgw"
+							},
+							{
+							"Key": "Environment",
+								 "Value": "datasciences.prod1"
+							}
+							]												
+						}
+					},
+					
+			"AttachIgwToVPC" : {
+				"Type" : "AWS::EC2::VPCGatewayAttachment",
+				"Properties" : {
+					"VpcId" : { "Ref" : "vpc1" },
+					"InternetGatewayId" : { "Ref" : "igw" }
+					}
+				},
+	
+			"AttachVgwToVPC" : {
+				"Type" : "AWS::EC2::VPCGatewayAttachment",
+				"Properties" : {
+					"VpcId" : { "Ref" : "vpc1" },
+					"VpnGatewayId" : { "Ref" : "vgw" }
+					}
+				}, 
+
+			"PrivNetworkAcl" : {
+			 "Type" : "AWS::EC2::NetworkAcl",
+			 "Properties" : {
+				"VpcId" : { "Ref" : "vpc1" },
+					"Tags": [{
+							"Key": "Name",
+							"Value": {"Fn::Join": [".", ["priv-nacl", {"Ref": "VPCName"}]]}
+							},
+							{
+							"Key": "ProductCode",
+								 "Value": "PRD00000122"
+							},
+							{
+							"Key": "InventoryCode",
+								 "Value": "network-privnacl"
+							},
+							{
+							"Key": "Environment",
+								 "Value": "datasciences.prod1"
+							}
+							]		 
+					}
+			},	
+			"PrivNetworkAclIngressAclEntries100"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "100",  "Protocol" : "1",  "RuleAction" : "allow", "Egress" : "false", "CidrBlock" : "0.0.0.0/0",  "Icmp" : { "Code" : "-1", "Type" : "-1" }}},
+			"PrivNetworkAclIngressAclEntries200"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "200",  "Protocol" : "6",  "RuleAction" : "allow", "Egress" : "false", "CidrBlock" : {"Ref":"sshSource1"},"PortRange" : { "From" : "22", "To" : "22" }}},
+			"PrivNetworkAclIngressAclEntries300"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "300",  "Protocol" : "6",  "RuleAction" : "allow", "Egress" : "false", "CidrBlock" : {"Ref":"sshSource2"},"PortRange" : { "From" : "22", "To" : "22" }}},
+			"PrivNetworkAclIngressAclEntries400"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "400",  "Protocol" : "6",  "RuleAction" : "allow", "Egress" : "false", "CidrBlock" : {"Ref":"sshSource3"},"PortRange" : { "From" : "22", "To" : "22" }}},
+			"PrivNetworkAclIngressAclEntries500"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "500",  "Protocol" : "-1","RuleAction" : "allow", "Egress" : "false", "CidrBlock" : {"Ref":"VPCCidrBlock"}}},
+			"PrivNetworkAclIngressAclEntries600"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "600",  "Protocol" : "6",  "RuleAction" : "deny",  "Egress" : "false", "CidrBlock" : "0.0.0.0/0","PortRange" : { "From" : "22", "To" : "22" }}},
+			"PrivNetworkAclIngressAclEntries700" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" :  "700", "Protocol" : "-1", "RuleAction" : "allow", "Egress" : "false", "CidrBlock" : "10.0.0.0/8"}}, 
+			"PrivNetworkAclIngressAclEntries800" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" :  "800", "Protocol" : "-1", "RuleAction" : "allow", "Egress" : "false", "CidrBlock" : "192.168.0.0/16"}}, 
+			"PrivNetworkAclIngressAclEntries900" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" :  "900", "Protocol" : "-1", "RuleAction" : "allow", "Egress" : "false", "CidrBlock" : "172.16.0.0/12"}}, 
+			"PrivNetworkAclIngressAclEntries1000" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" :  "1000", "Protocol" : "-1", "RuleAction" : "allow", "Egress" : "false", "CidrBlock" : "29.0.0.0/8"}},
+			"PrivNetworkAclIngressAclEntries1100" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" :  "1100", "Protocol" : "-1", "RuleAction" : "allow", "Egress" : "false", "CidrBlock" : "205.132.168.0/21"}},
+			"PrivNetworkAclIngressAclEntries1200" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "1200", "Protocol" : "-1", "RuleAction" : "allow", "Egress" : "false", "CidrBlock" : "209.104.32.0/19"}},
+			"PrivNetworkAclIngressAclEntries1300" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "1300", "Protocol" : "6",  "RuleAction" : "allow", "Egress" : "false", "CidrBlock" : "0.0.0.0/0","PortRange" : { "From" : "1", "To" : "65535" }}},
+
+			"PrivNetworkAclEgressAclEntries50"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "50",  "Protocol" : "-1","RuleAction" : "allow", "Egress" : "true", "CidrBlock" : {"Ref":"VPCCidrBlock"}}},
+			"PrivNetworkAclEgressAclEntries75"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "75",  "Protocol" : "6",  "RuleAction" : "allow",	"Egress" : "true", "CidrBlock" : "10.74.80.25/32","PortRange" : { "From" : "22", "To" : "22" }}},
+			"PrivNetworkAclEgressAclEntries76"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "76",  "Protocol" : "6",  "RuleAction" : "allow",	"Egress" : "true", "CidrBlock" : "10.159.192.0/19","PortRange" : { "From" : "22", "To" : "22" }}},
+			"PrivNetworkAclEgressAclEntries77"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "77",  "Protocol" : "6",  "RuleAction" : "allow",	"Egress" : "true", "CidrBlock" : "10.191.192.0/19","PortRange" : { "From" : "22", "To" : "22" }}},
+			"PrivNetworkAclEgressAclEntries78"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "78",  "Protocol" : "6",  "RuleAction" : "allow",	"Egress" : "true", "CidrBlock" : "10.127.192.0/19","PortRange" : { "From" : "22", "To" : "22" }}},
+			"PrivNetworkAclEgressAclEntries79"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "79",  "Protocol" : "6",  "RuleAction" : "allow",	"Egress" : "true", "CidrBlock" : "10.199.192.0/19","PortRange" : { "From" : "22", "To" : "22" }}},	
+			"PrivNetworkAclEgressAclEntries100"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" : "100",  "Protocol" : "6",  "RuleAction" : "deny",	"Egress" : "true", "CidrBlock" : "0.0.0.0/0","PortRange" : { "From" : "22", "To" : "23" }}},
+			"PrivNetworkAclEgressAclEntries200" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" :  "200", "Protocol" : "-1",  "RuleAction" : "allow",  "Egress" : "true", "CidrBlock" : "10.0.0.0/8"}},
+			"PrivNetworkAclEgressAclEntries300" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" :  "300", "Protocol" : "-1",  "RuleAction" : "allow",  "Egress" : "true", "CidrBlock" : "192.168.0.0/16"}},
+			"PrivNetworkAclEgressAclEntries400" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" :  "400", "Protocol" : "-1",  "RuleAction" : "allow",  "Egress" : "true", "CidrBlock" : "172.16.0.0/12"}},
+			"PrivNetworkAclEgressAclEntries500" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" :  "500", "Protocol" : "-1",  "RuleAction" : "allow",  "Egress" : "true", "CidrBlock" : "29.0.0.0/8"}},
+			"PrivNetworkAclEgressAclEntries600" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" :  "600", "Protocol" : "-1",  "RuleAction" : "allow",  "Egress" : "true", "CidrBlock" : "205.132.168.0/21"}},
+			"PrivNetworkAclEgressAclEntries700" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" :  "700", "Protocol" : "-1",  "RuleAction" : "allow",  "Egress" : "true", "CidrBlock" : "209.104.32.0/19"}},
+			"PrivNetworkAclEgressAclEntries800" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" :  "800", "Protocol" : "17",  "RuleAction" : "deny",   "Egress" : "true", "CidrBlock" : "0.0.0.0/0","PortRange" : { "From" : "1", "To" : "65535" }}},
+			"PrivNetworkAclEgressAclEntries900" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }, "RuleNumber" :  "900", "Protocol" : "-1",   "RuleAction" : "allow", "Egress" : "true", "CidrBlock" : "0.0.0.0/0"}},				
+			 "PubNetworkAcl" : {
+			 "Type" : "AWS::EC2::NetworkAcl",
+			 "Properties" : {
+				"VpcId" : { "Ref" : "vpc1" },
+					"Tags": [{
+							"Key": "Name",
+							"Value": {"Fn::Join": [".", ["pub-nacl", {"Ref": "VPCName"}]]}
+							},
+							{
+							"Key": "ProductCode",
+								 "Value": "PRD00000122"
+							},
+							{
+							"Key": "InventoryCode",
+								 "Value": "network-pubnacl"
+							},
+							{
+							"Key": "Environment",
+								 "Value": "datasciences.prod1"
+							}
+							]		 
+					}
+			},								 
+	
+			"PubNetworkAclIngressAclEntries100"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "100",  "Protocol" : "6",  "RuleAction" : "allow",  "Egress" : "false",  "CidrBlock" : {"Ref":"VPCCidrBlock"},"PortRange" : { "From" : "1", "To" : "65535" }}},
+			"PubNetworkAclIngressAclEntries200"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "200",  "Protocol" : "1",  "RuleAction" : "allow", "Egress" : "false", "CidrBlock" : "0.0.0.0/0",  "Icmp" : { "Code" : "-1", "Type" : "-1" }}},
+			"PubNetworkAclIngressAclEntries300"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "300","Protocol" : "-1",  "RuleAction" : "deny", "Egress" : "false", "CidrBlock" : "10.0.0.0/8"}},
+			"PubNetworkAclIngressAclEntries400"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "400","Protocol" : "-1",  "RuleAction" : "deny", "Egress" : "false", "CidrBlock" : "192.168.0.0/16"}},
+			"PubNetworkAclIngressAclEntries500"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "500","Protocol" : "-1",  "RuleAction" : "deny", "Egress" : "false", "CidrBlock" : "172.16.0.0/12"}},
+			"PubNetworkAclIngressAclEntries600"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "600","Protocol" : "-1",  "RuleAction" : "deny", "Egress" : "false", "CidrBlock" : "29.0.0.0/8"}},
+			"PubNetworkAclIngressAclEntries700" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "700", "Protocol" : "-1", "RuleAction" : "deny", "Egress" : "false", "CidrBlock" : "205.132.168.0/23"}},
+			"PubNetworkAclIngressAclEntries800" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "800", "Protocol" : "-1", "RuleAction" : "deny", "Egress" : "false", "CidrBlock" : "205.132.170.0/24"}},
+			"PubNetworkAclIngressAclEntries900" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "900", "Protocol" : "6",  "RuleAction" : "deny", "Egress" : "false", "CidrBlock" : "0.0.0.0/0","PortRange" : { "From" : "22", "To" : "23" }}},
+			"PubNetworkAclIngressAclEntries1000" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "1000", "Protocol" : "6",  "RuleAction" : "allow", "Egress" : "false", "CidrBlock" : "0.0.0.0/0","PortRange" : { "From" : "1", "To" : "65535" }}},
+				
+	
+			"PubNetworkAclEgressAclEntries100"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "100",  "Protocol" : "6",   "RuleAction" : "allow",   "Egress" : "true", "CidrBlock" : {"Ref":"VPCCidrBlock"},"PortRange" : { "From" : "1", "To" : "65535" }}},
+			"PubNetworkAclEgressAclEntries200"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "200",  "Protocol" : "1",  "RuleAction" : "allow", "Egress" : "true", "CidrBlock" : "0.0.0.0/0",  "Icmp" : { "Code" : "-1", "Type" : "-1" }}},
+			"PubNetworkAclEgressAclEntries300"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "300","Protocol" : "-1",  "RuleAction" : "deny", "Egress" : "true", "CidrBlock" : "10.0.0.0/8"}},
+			"PubNetworkAclEgressAclEntries400"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "400","Protocol" : "-1",  "RuleAction" : "deny", "Egress" : "true", "CidrBlock" : "192.168.0.0/16"}},
+			"PubNetworkAclEgressAclEntries500"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "500","Protocol" : "-1",  "RuleAction" : "deny", "Egress" : "true", "CidrBlock" : "172.16.0.0/12"}},
+			"PubNetworkAclEgressAclEntries600"  :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "600","Protocol" : "-1",  "RuleAction" : "deny", "Egress" : "true", "CidrBlock" : "29.0.0.0/8"}},
+			"PubNetworkAclEgressAclEntries700" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "700", "Protocol" : "-1",  "RuleAction" : "deny",  "Egress" : "true", "CidrBlock" : "205.132.168.0/23"}},
+			"PubNetworkAclEgressAclEntries800" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "800", "Protocol" : "-1",  "RuleAction" : "deny",  "Egress" : "true", "CidrBlock" : "205.132.170.0/24"}},
+			"PubNetworkAclEgressAclEntries900" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "900", "Protocol" : "6",  "RuleAction" : "deny", "Egress" : "true", "CidrBlock" : "0.0.0.0/0","PortRange" : {"From" : "22", "To" : "23"}}},
+			"PubNetworkAclEgressAclEntries1000" :{ "Type" : "AWS::EC2::NetworkAclEntry", "Properties" : { "NetworkAclId" : { "Ref" : "PubNetworkAcl" }, "RuleNumber" : "1000", "Protocol" : "6",  "RuleAction" : "allow", "Egress" : "true", "CidrBlock" : "0.0.0.0/0","PortRange" : {"From" : "1", "To" : "65535"}}},
+			
+			"pubrtb" : {
+				"Type" : "AWS::EC2::RouteTable",
+				"Properties" : {
+					"VpcId" : { "Ref" : "vpc1" },
+					"Tags" : [{
+						"Key" : "Name",
+						"Value" : {
+							"Fn::Join": [".", [
+								"pub", {
+									"Ref":"VPCName"
+										}
+									]
+								]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-pubrtb"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						}					
+					]
+				}
+			},
+			
+			"privnat1rtb" : {
+				"Type" : "AWS::EC2::RouteTable",
+				"Properties" : {
+					"VpcId" : { "Ref" : "vpc1" },
+					"Tags" : [{
+						"Key" : "Name",
+						"Value" : {
+							"Fn::Join": [".", [
+								"priv&nat1", {
+									"Ref":"VPCName"
+										}
+									]
+								]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-privnat1rtb"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						}
+					]
+				}
+			},
+			
+			"privnat2rtb" : {
+				"Type" : "AWS::EC2::RouteTable",
+				"Properties" : {
+					"VpcId" : { "Ref" : "vpc1" },
+					"Tags" : [{
+						"Key" : "Name",
+						"Value" : {
+							"Fn::Join": [".", [
+								"priv&nat2", {
+									"Ref":"VPCName"
+										}
+									]
+								]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-privnat2rtb"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						}   
+					]
+				}
+			},
+			
+			"privnat3rtb" : {
+				"Type" : "AWS::EC2::RouteTable",
+				"Properties" : {
+					"VpcId" : { "Ref" : "vpc1" },
+					"Tags" : [{
+						"Key" : "Name",
+						"Value" : {
+							"Fn::Join": [".", [
+								"priv&nat3", {
+									"Ref":"VPCName"
+										}
+									]
+								]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-privnat3rtb"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						}  
+					]
+				}
+			},
+			
+		"WebSubnet1" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1a",
+				"CidrBlock": "10.182.128.0/25",
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["web-1", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-websubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "private"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		"PrivNetNaclAssocToWebSubnet1": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				"SubnetId":{"Ref":"WebSubnet1"},
+				"NetworkAclId" : { "Ref" : "PrivNetworkAcl" }
+				}
+		},
+		
+		"privnat1rtbAssocToWebSubnet1":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+				"SubnetId":{"Ref":"WebSubnet1"},
+				"RouteTableId":{"Ref":"privnat1rtb"}
+			}
+		},
+		
+		"WebSubnet2" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1b",
+				"CidrBlock": "10.182.128.128/25",
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["web-2", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-websubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "private"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		"PrivNetNaclAssocToWebSubnet2": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				"SubnetId":{"Ref":"WebSubnet2"},
+				"NetworkAclId" : { "Ref" : "PrivNetworkAcl" }
+				}
+		},
+		
+		"privnat2rtbAssocToWebSubnet2":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"WebSubnet2"},
+					"RouteTableId":{"Ref":"privnat2rtb"}
+			}
+		},
+			
+		"WebSubnet3" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1c",
+				"CidrBlock": "10.182.129.0/25",
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["web-3", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-websubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "private"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		"PrivNetNaclAssocToWebSubnet3": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				"SubnetId":{"Ref":"WebSubnet3"},
+				"NetworkAclId" : { "Ref" : "PrivNetworkAcl" }
+				}
+		},
+		
+		"privnat3rtbAssocToWebSubnet3":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"WebSubnet3"},
+					"RouteTableId":{"Ref":"privnat3rtb"}
+			}
+		},
+		
+		"AppSubnet1" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1a",
+				"CidrBlock": "10.182.130.0/25",
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["app-1", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-appsubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "private"
+						}					
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		"PrivNetNaclAssocToAppSubnet1": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				"SubnetId":{"Ref":"AppSubnet1"},
+				"NetworkAclId" : { "Ref" : "PrivNetworkAcl" }
+			}
+		},
+		
+		"privnat1rtbAssocToAppSubnet1":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"AppSubnet1"},
+					"RouteTableId":{"Ref":"privnat1rtb"}
+			}
+		},
+		
+		"AppSubnet2" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1b",
+				"CidrBlock": "10.182.130.128/25",
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["app-2", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-appsubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "private"
+						}					
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		"PrivNetNaclAssocToAppSubnet2": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				"SubnetId":{"Ref":"AppSubnet2"},
+				"NetworkAclId" : { "Ref" : "PrivNetworkAcl" }
+			}
+		},
+		
+		"privnat2rtbAssocToAppSubnet2":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"AppSubnet2"},
+					"RouteTableId":{"Ref":"privnat2rtb"}
+			}
+		},
+		
+		"AppSubnet3" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1c",
+				"CidrBlock": "10.182.131.0/25",
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["app-3", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-appsubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "private"
+						}					
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		"PrivNetNaclAssocToAppSubnet3": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				"SubnetId":{"Ref":"AppSubnet3"},
+				"NetworkAclId" : { "Ref" : "PrivNetworkAcl" }
+			}
+		},
+		
+		"privnat3rtbAssocToAppSubnet3":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"AppSubnet3"},
+					"RouteTableId":{"Ref":"privnat3rtb"}
+			}
+		},
+		
+		"DbSubnet1" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1a",
+				"CidrBlock": "10.182.132.0/26",					
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["db-1", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-dbsubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "private"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		"PrivNetNaclAssocToDbSubnet1": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				 "SubnetId":{"Ref":"DbSubnet1"},
+				 "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }
+							}
+		},
+		
+		"privnat3rtbAssocToDbSubnet1":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"DbSubnet1"},
+					"RouteTableId":{"Ref":"privnat1rtb"}
+			}
+		},
+		
+		"DbSubnet2" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1b",
+				"CidrBlock": "10.182.132.64/26",					
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["db-2", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-dbsubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "private"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		"PrivNetNaclAssocToDbSubnet2": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				 "SubnetId":{"Ref":"DbSubnet2"},
+				 "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }
+							}
+		},
+		
+		"privnat3rtbAssocToDbSubnet2":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"DbSubnet2"},
+					"RouteTableId":{"Ref":"privnat2rtb"}
+			}
+		},
+		
+		"DbSubnet3" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1c",
+				"CidrBlock": "10.182.132.128/26",					
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["db-3", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-dbsubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "private"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		"PrivNetNaclAssocToDbSubnet3": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				 "SubnetId":{"Ref":"DbSubnet3"},
+				 "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }
+							}
+		},
+		
+		"privnat3rtbAssocToDbSubnet3":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"DbSubnet3"},
+					"RouteTableId":{"Ref":"privnat3rtb"}
+			}
+		},
+		
+		"CsSubnet1" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1a",
+				"CidrBlock": "10.182.133.0/26",	
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["cs-1", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-cssubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "private"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+			},
+		"PrivNetNaclAssocToCsSubnet1": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				 "SubnetId":{"Ref":"CsSubnet1"},
+				 "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }
+				}
+		 },
+		 
+		"privnat1rtbAssocToCsSubnet1":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"CsSubnet1"},
+					"RouteTableId":{"Ref":"privnat1rtb"}
+				}
+			},
+			
+		"CsSubnet2" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1b",
+				"CidrBlock": "10.182.133.64/26",	
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["cs-2", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-cssubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "private"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+			},
+		"PrivNetNaclAssocToCsSubnet2": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				 "SubnetId":{"Ref":"CsSubnet2"},
+				 "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }
+				}
+		 },
+		 
+		"privnat2rtbAssocToCsSubnet2":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"CsSubnet2"},
+					"RouteTableId":{"Ref":"privnat2rtb"}
+			}
+		},
+		
+		"CsSubnet3" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1c",
+				"CidrBlock": "10.182.133.128/26",	
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["cs-3", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-cssubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "private"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+			},
+		"PrivNetNaclAssocToCsSubnet3": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				 "SubnetId":{"Ref":"CsSubnet3"},
+				 "NetworkAclId" : { "Ref" : "PrivNetworkAcl" }
+				}
+		 },
+		 
+		"privnat3rtbAssocToCsSubnet3":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"CsSubnet3"},
+					"RouteTableId":{"Ref":"privnat3rtb"}
+			}
+		},
+		
+		"PubInSubnet1" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1a",
+				"CidrBlock": "10.182.134.0/26",
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["pubin-1", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-pubinsubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "public-inbound"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		
+		"PubNaclAssocToPubInSubnet1": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				 "SubnetId":{"Ref":"PubInSubnet1"},
+				 "NetworkAclId" : { "Ref" :"PubNetworkAcl"}
+			}
+		},
+		
+		"pubrtbAssocToPubInSubnet1":{ 
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"PubInSubnet1"},
+					"RouteTableId":{"Ref":"pubrtb"}
+			}
+		},
+		
+		"PubInSubnet2" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1b",
+				"CidrBlock": "10.182.134.64/26",
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["pubin-2", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-pubinsubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "public-inbound"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		
+		"PubNaclAssocToPubInSubnet2": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				 "SubnetId":{"Ref":"PubInSubnet2"},
+				 "NetworkAclId" : { "Ref" :"PubNetworkAcl"}
+			}
+		},
+		
+		"pubrtbAssocToPubInSubnet2":{ 
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"PubInSubnet2"},
+					"RouteTableId":{"Ref":"pubrtb"}
+			}
+		},
+		
+		"PubInSubnet3" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1c",
+				"CidrBlock": "10.182.134.128/26",
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["pubin-3", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-pubinsubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "public-inbound"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		
+		"PubNaclAssocToPubInSubnet3": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				 "SubnetId":{"Ref":"PubInSubnet3"},
+				 "NetworkAclId" : { "Ref" :"PubNetworkAcl"}
+			}
+		},
+		
+		"pubrtbAssocToPubInSubnet3":{  
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"PubInSubnet3"},
+					"RouteTableId":{"Ref":"pubrtb"}
+			}
+		},
+		
+		"PubOutSubnet1" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1a",
+				"CidrBlock": "10.182.135.0/26",																							
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["pubout-1", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-puboutsubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "public-outbound"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		"PubNaclAssocToPubOutSubnet1": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				 "SubnetId":{"Ref":"PubOutSubnet1"},
+				 "NetworkAclId" : { "Ref" : "PubNetworkAcl" }
+			}
+		},
+		
+		"pubrtbAssocToPubOutSubnet1":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"PubOutSubnet1"},
+					"RouteTableId":{"Ref":"pubrtb"}
+			}
+		},
+		
+		"PubOutSubnet2" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1b",
+				"CidrBlock": "10.182.135.64/26",																							
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["pubout-2", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-puboutsubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "public-outbound"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		"PubNaclAssocToPubOutSubnet2": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				 "SubnetId":{"Ref":"PubOutSubnet2"},
+				 "NetworkAclId" : { "Ref" : "PubNetworkAcl" }
+			}
+		},
+		
+		"pubrtbAssocToPubOutSubnet2":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"PubOutSubnet2"},
+					"RouteTableId":{"Ref":"pubrtb"}
+			}
+		},
+		
+		"PubOutSubnet3" : {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"AvailabilityZone": "us-east-1c",
+				"CidrBlock": "10.182.135.128/26",																							
+				"Tags": [{
+						"Key": "Name",
+						"Value": {
+							"Fn::Join": [".", ["pubout-3", {"Ref": "VPCName"}]]
+							}
+						},
+						{
+						"Key": "ProductCode",
+							 "Value": "PRD00000122"
+						},
+						{
+						"Key": "InventoryCode",
+							 "Value": "network-puboutsubnet"
+						},
+						{
+						"Key": "Environment",
+							 "Value": "datasciences.prod1"
+						},
+						{
+						"Key": "SubnetType",
+							 "Value": "public-outbound"
+						}
+						],
+				"VpcId": {
+					"Ref": "vpc1"
+				}
+			}
+		},
+		"PubNaclAssocToPubOutSubnet3": {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				 "SubnetId":{"Ref":"PubOutSubnet3"},
+				 "NetworkAclId" : { "Ref" : "PubNetworkAcl" }
+			}
+		},
+		
+		"pubrtbAssocToPubOutSubnet3":{
+			"Type":"AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" :"AttachVgwToVPC",
+			"Properties":{
+					"SubnetId":{"Ref":"PubOutSubnet3"},
+					"RouteTableId":{"Ref":"pubrtb"}
+			}
+		},
+		
+			"NatIP1": {
+				"Type": "AWS::EC2::EIP",
+				"DependsOn": "AttachIgwToVPC",
+				"Properties": {
+					"Domain": "vpc"
+				}
+			},
+			"NatIP2": {
+				"Type": "AWS::EC2::EIP",
+				"DependsOn": "AttachIgwToVPC",
+				"Properties": {
+					"Domain": "vpc"
+				}
+			},
+			"NatIP3": {
+				"Type": "AWS::EC2::EIP",
+				"DependsOn": "AttachIgwToVPC",
+				"Properties": {
+					"Domain": "vpc"
+				}
+			},
+			"NatGateway1" : {
+			  "DependsOn" : "AttachIgwToVPC",
+			  "Type" : "AWS::EC2::NatGateway",
+			  "Properties" : {
+			    "AllocationId" : { "Fn::GetAtt" : ["NatIP1", "AllocationId"]},
+			    "SubnetId" : { "Ref" : "PubOutSubnet1"}
+			  }
+			},
+			"NatGateway2" : {
+			  "DependsOn" : "AttachIgwToVPC",
+			  "Type" : "AWS::EC2::NatGateway",
+			  "Properties" : {
+			    "AllocationId" : { "Fn::GetAtt" : ["NatIP2", "AllocationId"]},
+			    "SubnetId" : { "Ref" : "PubOutSubnet2"}
+			  }
+			},
+			"NatGateway3" : {
+			  "DependsOn" : "AttachIgwToVPC",
+			  "Type" : "AWS::EC2::NatGateway",
+			  "Properties" : {
+			    "AllocationId" : { "Fn::GetAtt" : ["NatIP3", "AllocationId"]},
+			    "SubnetId" : { "Ref" : "PubOutSubnet3"}
+			  }
+			},
+			"PubRouteDefault":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachIgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "0.0.0.0/0",
+					"GatewayId" : {
+						"Ref":"igw"},
+					"RouteTableId" : {
+						"Ref":"pubrtb"}
+				}
+			}, 
+			
+			"PrivNat1RouteDefault":{		
+          	  	"Type" : "AWS::EC2::Route",
+				"DependsOn": [
+					"NatGateway1",
+					"pubrtbAssocToPubOutSubnet1"
+				],
+				"Properties": {
+					"RouteTableId": {
+					"Ref": "privnat1rtb"
+					},
+					"DestinationCidrBlock": "0.0.0.0/0",
+					"NatGatewayId": {
+					"Ref": "NatGateway1"
+					}
+				}
+			},
+			
+			"PrivNat1Route10":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "10.0.0.0/8",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat1rtb"}
+				}
+			},
+			
+			"PrivNat1Route29":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "29.0.0.0/8",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat1rtb"}
+					}
+			},
+			"PrivNat1Route192":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "192.168.0.0/16",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat1rtb"}
+				}
+			},		
+			"PrivNat1Route172":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "172.16.0.0/12",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat1rtb"}
+				}
+			},
+	
+			"PrivNat1Route205168":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "205.132.168.0/23",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat1rtb"}
+				}
+			},			 
+		
+			"PrivNat2RouteDefault":{	
+          	  	"Type" : "AWS::EC2::Route",
+				"DependsOn": [
+					"NatGateway2",
+					"pubrtbAssocToPubOutSubnet2"
+				],
+				"Properties": {
+					"RouteTableId": {
+					"Ref": "privnat2rtb"
+					},
+					"DestinationCidrBlock": "0.0.0.0/0",
+					"NatGatewayId": {
+					"Ref": "NatGateway2"
+					}
+				}
+			},
+			
+			"PrivNat2Route10":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "10.0.0.0/8",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat2rtb"}
+				}
+			},
+			
+			"PrivNat2Route29":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "29.0.0.0/8",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat2rtb"}
+				}
+			},
+			"PrivNat2Route192":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "192.168.0.0/16",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat2rtb"}
+				}
+			},		
+			"PrivNat2Route172":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "172.16.0.0/12",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat2rtb"}
+				}
+			},
+			"PrivNat2Route205168":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "205.132.168.0/23",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat2rtb"}
+				}
+			},		 
+			"PrivNat3RouteDefault":{		
+          	  	"Type" : "AWS::EC2::Route",
+				"DependsOn": [	
+					"NatGateway3",
+					"pubrtbAssocToPubOutSubnet3"
+				],
+				"Properties": {
+					"RouteTableId": {
+					"Ref": "privnat3rtb"
+					},
+					"DestinationCidrBlock": "0.0.0.0/0",
+					"NatGatewayId": {
+					"Ref": "NatGateway3"
+					}
+				}
+			},
+			
+			"PrivNat3Route10":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "10.0.0.0/8",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat3rtb"}
+				}
+			},
+			
+			"PrivNat3Route29":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "29.0.0.0/8",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat3rtb"}
+				}
+			},
+			"PrivNat3Route192":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "192.168.0.0/16",
+					"GatewayId" : {
+						"Ref":"vgw"
+						},
+					"RouteTableId" : {
+						"Ref":"privnat3rtb"}
+				}
+			},		
+			"PrivNat3Route172":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "172.16.0.0/12",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat3rtb"}
+				}
+			},
+			"PrivNat3Route205168":{ 
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" :"AttachVgwToVPC",
+				"Properties" : {
+					"DestinationCidrBlock" : "205.132.168.0/23",
+					"GatewayId" : {
+						"Ref":"vgw"},
+					"RouteTableId" : {
+						"Ref":"privnat3rtb"}
+			}
+		},
+		"S3Endpoint" : {
+			"Type" : "AWS::EC2::VPCEndpoint",
+			"Properties" : {
+				"PolicyDocument" : {
+					"Version":"2012-10-17",
+					"Statement":[{
+						"Effect":"Allow",
+						"Principal": "*",
+						"Action":["*"],
+						"Resource":["*"]
+						}]
+				},
+			"RouteTableIds" : [ {"Ref" : "privnat1rtb"}, {"Ref" : "privnat2rtb"}, {"Ref" : "privnat3rtb"} ],
+			"ServiceName" : { "Fn::Join": [ "", [ "com.amazonaws.", { "Ref": "AWS::Region" }, ".s3" ] ] },
+			"VpcId" : {"Ref" : "vpc1"}
+			}
+		}
+	},	   
+	
+  "Outputs" : {
+  	"vpc1id" : {
+		"Description" : "VPC Id for datasciences.prod in us-east-1 region",
+		"Value" :  {
+		"Ref" : "vpc1"
+		}
+	 },
+	 
+		"WebSubnet1id" : {
+			"Description" : "subnetid for WebSubnet1 in AZ us-east-1a",
+			"Value" :  {
+			"Ref" : "WebSubnet1"
+			}
+		 },
+		 
+		"WebSubnet2id" : {
+			"Description" : "subnetid for WebSubnet2 in AZ us-east-1b",
+			"Value" :  {
+			"Ref" : "WebSubnet2"
+			}
+		 },
+		 
+		"WebSubnet3id" : {
+			"Description" : "subnetid for WebSubnet3 in AZ us-east-1c",
+			"Value" :  {
+			"Ref" : "WebSubnet3"
+			}
+		 },
+		 
+		"AppSubnet1id" : {
+			"Description" : "subnetid for AppSubnet1 in AZ us-east-1a",
+			"Value" :  {
+			"Ref" : "AppSubnet1"
+			}
+		 },
+		 
+		"AppSubnet2id" : {
+			"Description" : "subnetid for AppSubnet2 in AZ us-east-1b",
+			"Value" :  {
+			"Ref" : "AppSubnet2"
+			}
+		 },
+		 
+		"AppSubnet3id" : {
+			"Description" : "subnetid for AppSubnet3 in AZ us-east-1c",
+			"Value" :  {
+			"Ref" : "AppSubnet3"
+			}
+		 },
+		 
+		"DbSubnet1id" : {
+			"Description" : "subnetid for DbSubnet1 in AZ us-east-1a",
+			"Value" :  {
+			"Ref" : "DbSubnet1"
+			}
+		 },
+		 
+		"DbSubnet2id" : {
+			"Description" : "subnetid for DbSubnet2 in AZ us-east-1b",
+			"Value" :  {
+			"Ref" : "DbSubnet2"
+			}
+		 },
+		 
+		"DbSubnet3id" : {
+			"Description" : "subnetid for DbSubnet3 in AZ us-east-1c",
+			"Value" :  {
+			"Ref" : "DbSubnet3"
+			}
+		 },
+		 
+		"CsSubnet1id" : {
+			"Description" : "subnetid for CsSubnet1 in AZ us-east-1a",
+			"Value" :  {
+			"Ref" : "CsSubnet1"
+			}
+		 },
+		 
+		"CsSubnet2id" : {
+			"Description" : "subnetid for CsSubnet2 in AZ us-east-1b",
+			"Value" :  {
+			"Ref" : "CsSubnet2"
+			}
+		 },
+		 
+		"CsSubnet3id" : {
+			"Description" : "subnetid for CsSubnet3 in AZ us-east-1c",
+			"Value" :  {
+			"Ref" : "CsSubnet3"
+			}
+		 },
+		 
+		"PubInSubnet1id" : {
+			"Description" : "subnetid for PubInSubnet1 in AZ us-east-1a",
+			"Value" :  {
+			"Ref" : "PubInSubnet1"
+			}
+		 },
+		 
+		"PubInSubnet2id" : {
+			"Description" : "subnetid for PubInSubnet2 in AZ us-east-1b",
+			"Value" :  {
+			"Ref" : "PubInSubnet2"
+			}
+		 },
+		 
+		"PubInSubnet3id" : {
+			"Description" : "subnetid for PubInSubnet3 in AZ us-east-1c",
+			"Value" :  {
+			"Ref" : "PubInSubnet3"
+			}
+		 },
+		 
+		"PubOutSubnet1id" : {
+			"Description" : "subnetid for PubOutSubnet1 in AZ us-east-1a",
+			"Value" :  {
+			"Ref" : "PubOutSubnet1"
+			}
+		 },
+		 
+		"PubOutSubnet2id" : {
+			"Description" : "subnetid for PubOutSubnet2 in AZ us-east-1b",
+			"Value" :  {
+			"Ref" : "PubOutSubnet2"
+			}
+		 },
+		 
+		"PubOutSubnet3id" : {
+			"Description" : "subnetid for PubOutSubnet3 in AZ us-east-1c",
+			"Value" :  {
+			"Ref" : "PubOutSubnet3"
+			}
+		 },
+		 
+	"privnat1rtbid" : {
+		"Description" : "Routing Table Id for priv&nat1rtb",
+		"Value" :  {
+		"Ref" : "privnat1rtb"
+		}
+	 },
+	"privnat2rtbid" : {
+		"Description" : "Routing Table Id for priv&nat2rtb",
+		"Value" :  {
+		"Ref" : "privnat2rtb"
+		}
+	 },
+	"privnat3rtbid" : {
+		"Description" : "Routing Table Id for priv&nat3rtb",
+		"Value" :  {
+		"Ref" : "privnat3rtb"
+		}
+	 },
+	 "NatEIP1" : {
+		"Description" : "IP address for NAT EIP1",
+		"Value" :  {
+		"Ref" : "NatIP1"
+		}
+	 },
+	"NatEIP2" : {
+		"Description" : "IP address for NAT EIP2",
+		"Value" :  {
+		"Ref" : "NatIP2"
+		}
+	 },
+	"NatEIP3" : {
+		"Description" : "IP address for NAT EIP3",
+		"Value" :  {
+		"Ref" : "NatIP3"
+		 }
+	 },
+	"pubNACLid": {
+		"Description" : "Public NACL Id",
+		"Value" :  {
+		"Ref" : "PubNetworkAcl"
+		}
+	 },
+	"privNACLid": {
+		"Description" : "Private NACL Id",
+		"Value" :  {
+		"Ref" : "PrivNetworkAcl"
+		}
+	 }
+	 
+	
+		}
+	}
+	
